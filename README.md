@@ -1,25 +1,29 @@
-# STM32F407 ile nokta vuruşlu yazıcı kafası sürme
+# Driving a 9-pin dot matrix print head
 
-> [TECH-OHM](https://tech-ohm.com) açık kaynak projesi
+STM32F407 · solenoid pulse timing · 5x9 bitmap font
 
-Eski bir 9 iğneli nokta vuruşlu yazıcının kafasını, yazıcının kendi kartı olmadan doğrudan STM32 ile süren deneme yazılımı. Her iğnenin arkasında bir solenoid var. Doğru iğneleri doğru anda kısa bir darbeyle ateşleyince kağıtta harf oluşuyor.
+![MCU](https://img.shields.io/badge/MCU-STM32F407VG-03234B?logo=stmicroelectronics&logoColor=white) ![IDE](https://img.shields.io/badge/IDE-STM32CubeIDE-2ea44f) ![License](https://img.shields.io/badge/license-MIT-blue) [![TECH-OHM](https://img.shields.io/badge/by-TECH--OHM-FFD400)](https://tech-ohm.com)
 
-Bu sürümde kafayı taşıyan motor sürülmüyor. Kafa elle kaydırılıyor, yazılım sadece iğneleri sütun sütun ateşliyor. Amaç solenoid sürme devresini ve darbe süresini doğrulamaktı.
+**English** | [Türkçe](README.tr.md) · An open-source project by [TECH-OHM](https://tech-ohm.com)
 
-## Blok diyagram
+Test firmware that drives the head of an old 9-pin dot matrix printer directly from an STM32, without the printer's own board. Behind each pin is a solenoid. Firing the right pins at the right moment with a short pulse forms a character on paper.
+
+This version does not drive the carriage motor. The head is moved by hand and the firmware only fires the pins column by column. The goal was to verify the solenoid drive circuit and the pulse width.
+
+## Block diagram
 
 ```mermaid
 flowchart LR
-    FONT[5x9 font tablosu] --> COL[printColumn: sütun bit haritası]
+    FONT[5x9 font table] --> COL[printColumn: column bitmap]
     TIM[TIM2, 1 MHz] --> COL
-    COL -- "9 GPIO, aktif 0" --> DRV[9 MOSFET sürücü]
-    DRV --> HEAD[Yazıcı kafası, 9 solenoid]
-    PSU[Kafa beslemesi] --> HEAD
+    COL -- "9 GPIO, active low" --> DRV[9 MOSFET drivers]
+    DRV --> HEAD[Print head, 9 solenoids]
+    PSU[Head supply] --> HEAD
 ```
 
-## Pinler
+## Pins
 
-| İğne | Pin | | İğne | Pin |
+| Pin on head | MCU pin | | Pin on head | MCU pin |
 |---|---|---|---|---|
 | 1 | PA4 | | 6 | PC3 |
 | 2 | PA3 | | 7 | PC2 |
@@ -27,52 +31,52 @@ flowchart LR
 | 4 | PA1 | | 9 | PC0 |
 | 5 | PA0 | | | |
 
-Çıkışlar aktif 0: pin 0 olunca solenoid enerjileniyor, 1 olunca bırakıyor. Açılışta bütün pinler 1'e çekiliyor.
+Outputs are active low: 0 energizes the solenoid, 1 releases it. All pins are set to 1 at startup.
 
-Solenoidleri işlemci pini süremez. Her iğne için bir MOSFET ve solenoide paralel ters diyot şart, yoksa bobin kapanırken oluşan gerilim MOSFET'i yakar.
+An MCU pin cannot drive a solenoid. Each pin needs a MOSFET and a flyback diode across the coil. Without the diode, the voltage spike when the coil switches off destroys the MOSFET.
 
-## Nasıl çalışıyor
+## How it works
 
-Her harf 5 sütun ve 9 satırlık bir tabloda tanımlı. Bir sütun 9 bitlik bir sayı, 0. bit 1 numaralı iğneye karşılık geliyor:
+Each character is a table of 5 columns by 9 rows. A column is a 9-bit number where bit 0 is pin 1:
 
 ```c
 {'E', {0b111111111, 0b100100001, 0b100100001, 0b100100001, 0b100000001}},
 ```
 
-Bir sütun basılırken:
+To print one column:
 
-1. Sütundaki 1 olan bitlerin iğneleri aynı anda ateşlenir.
-2. `PULSE_WIDTH_US` kadar (1000 µs) beklenir.
-3. Bütün iğneler bırakılır.
-4. `COL_DELAY_MS` kadar (50 ms) beklenir. Kafa bu sürede bir sütun kaydırılır.
+1. The pins whose bits are 1 fire together.
+2. The firmware waits `PULSE_WIDTH_US` (1000 µs).
+3. All pins are released.
+4. It waits `COL_DELAY_MS` (50 ms). The head is moved one column during this time.
 
-Darbe süresi TIM2 ile mikrosaniye hassasiyetinde sayılıyor. Süre kısa olursa iğne kağıda ulaşmıyor, uzun olursa bobin ısınıyor. Doğru değer kafadan kafaya değişir, kafanın datasheet'indeki darbe süresi ve besleme gerilimine göre ayarla.
+The pulse is timed with TIM2 at microsecond resolution. Too short and the pin does not reach the paper, too long and the coil heats up. The right value depends on the head, so set it from the pulse width and supply voltage in the head's datasheet.
 
-Yazılım açılışta 3 saniye bekliyor (kafayı satır başına almak için), sonra `printText` içindeki metni basıp 5 saniye sonra tekrarlıyor.
+At startup the firmware waits 3 seconds (time to bring the head to the start of the line), prints the text in `printText`, and repeats after 5 seconds.
 
 ## Font
 
-Tabloda şimdilik sadece denemede kullandığım harfler var: M, E, R, H, A, B, T, I ve boşluk. Yeni harf eklemek için `font` dizisine beş sütunluk bir satır eklemek yeterli. Tabloda olmayan karakter boşluk olarak basılır.
+For now the table has only the letters I used in testing: M, E, R, H, A, B, T, I and space. Adding a letter means adding one five-column row to the `font` array. A character that is not in the table prints as a space.
 
-## Eksikler
+## Limitations
 
-- Kafa motoru ve kağıt besleme yok, kafa elle kaydırılıyor.
-- Solenoidlerin art arda çalışma süresi sınırlanmıyor. Uzun metinlerde kafanın ısınmasına dikkat et.
+- No carriage motor and no paper feed. The head is moved by hand.
+- Solenoid on-time over a long run is not limited. Watch the head temperature with long text.
 
-## Derleme
+## Build
 
-STM32CubeIDE'de `File > Import > Existing Projects into Workspace` ile klasörü seç. Saat dahili osilatörden 84 MHz.
+In STM32CubeIDE use `File > Import > Existing Projects into Workspace` and select this folder. The clock is 84 MHz from the internal oscillator.
 
-## Lisans
+## License
 
-MIT. `Drivers` klasöründeki STM32 HAL ve CMSIS dosyaları kendi lisanslarıyla gelir.
+MIT. The STM32 HAL and CMSIS files under `Drivers` keep their own licenses.
 
-## Yazar
+## Author
 
-Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com) kurucusu
+M. Eyüb Can, embedded systems engineer and founder of [TECH-OHM](https://tech-ohm.com)
 
-## TECH-OHM
+## About TECH-OHM
 
-[TECH-OHM](https://tech-ohm.com) elektronik kart ve gömülü yazılım tasarlayan bir mühendislik firması. Fikirden seri üretime kadar tasarım işi alıyor, TECH-OHM Akademi'de 12 aylık gömülü sistem eğitimi ve şirketlere özel danışmanlık veriyor.
+[TECH-OHM](https://tech-ohm.com) designs electronic boards and embedded software, from the first schematic to series production. We also run a 12-month embedded systems training program and consult for engineering teams.
 
-Web: [tech-ohm.com](https://tech-ohm.com) · E-posta: info@tech-ohm.com
+Web: [tech-ohm.com](https://tech-ohm.com) · Email: info@tech-ohm.com
