@@ -1,5 +1,7 @@
 # STM32F407 ile nokta vuruşlu yazıcı kafası sürme
 
+> [TECH-OHM](https://tech-ohm.com) açık kaynak projesi
+
 Eski bir 9 iğneli nokta vuruşlu yazıcının kafasını, yazıcının kendi kartı olmadan doğrudan STM32 ile süren deneme yazılımı. Her iğnenin arkasında bir solenoid var. Doğru iğneleri doğru anda kısa bir darbeyle ateşleyince kağıtta harf oluşuyor.
 
 Bu sürümde kafayı taşıyan motor sürülmüyor. Kafa elle kaydırılıyor, yazılım sadece iğneleri sütun sütun ateşliyor. Amaç solenoid sürme devresini ve darbe süresini doğrulamaktı.
@@ -67,4 +69,10 @@ MIT. `Drivers` klasöründeki STM32 HAL ve CMSIS dosyaları kendi lisanslarıyla
 
 ## Yazar
 
-Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com)
+Gömülü Sistem Mühendisi M. Eyüb Can, [TECH-OHM](https://tech-ohm.com) kurucusu
+
+## TECH-OHM
+
+[TECH-OHM](https://tech-ohm.com) elektronik kart ve gömülü yazılım tasarlayan bir mühendislik firması. Fikirden seri üretime kadar tasarım işi alıyor, TECH-OHM Akademi'de 12 aylık gömülü sistem eğitimi ve şirketlere özel danışmanlık veriyor.
+
+Web: [tech-ohm.com](https://tech-ohm.com) · E-posta: info@tech-ohm.com
