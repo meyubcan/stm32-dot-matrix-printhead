@@ -22,10 +22,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-// --- TANIMLAMALAR ---
-#define PULSE_WIDTH_US   1000   // Solenoid darbe süresi (µs)
-#define COL_DELAY_MS     50  // Kolon arası bekleme (elle kaydırma için)
-#define CHAR_SPACE_MS    100  // Karakter arası bekleme
+// --- SETTINGS ---
+#define PULSE_WIDTH_US   1000   // solenoid pulse width (us)
+#define COL_DELAY_MS     50  // wait between columns (time to move the head by hand)
+#define CHAR_SPACE_MS    100  // wait between characters
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -73,18 +73,18 @@ const CharDef font[] = {
 };
 #define FONT_SIZE (sizeof(font) / sizeof(font[0]))
 
-// Yazılacak metin
-const char* printText = "MERHABA";
+// Text to print
+const char* printText = "HI THERE";
 
-// --- YARDIMCI FONKSİYONLAR ---
+// --- HELPERS ---
 
-// Mikrosaniye geciktirme (TIM2 kullanır)
+// Microsecond delay (uses TIM2)
 void delay_us(uint16_t us) {
     __HAL_TIM_SET_COUNTER(&htim2, 0);
     while (__HAL_TIM_GET_COUNTER(&htim2) < us);
 }
 
-// Tek iğneyi ateşle (pin numarası 1-9)
+// Fire one pin (pin number 1-9)
 void firePin(uint8_t pin) {
     switch(pin) {
         case 1: HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); break;
@@ -99,7 +99,7 @@ void firePin(uint8_t pin) {
     }
 }
 
-// Tek iğneyi kapat
+// Release one pin
 void releasePin(uint8_t pin) {
     switch(pin) {
         case 1: HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); break;
@@ -114,19 +114,19 @@ void releasePin(uint8_t pin) {
     }
 }
 
-// Bir kolonu bas (hangi iğnelerin aktif olduğu bitmap ile)
+// Print one column. The bitmap says which pins fire.
 void printColumn(uint16_t colBitmap) {
-    // Aktif iğneleri bul ve ateşle
+    // Fire the pins whose bits are set
     for (uint8_t pin = 1; pin <= 9; pin++) {
         if (colBitmap & (1 << (pin - 1))) {
             firePin(pin);
         }
     }
 
-    // Darbe süresi bekle
+    // Hold for the pulse width
     delay_us(PULSE_WIDTH_US);
 
-    // Tüm iğneleri kapat
+    // Release all pins
     HAL_GPIO_WritePin(GPIOA,
         GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|
         GPIO_PIN_3|GPIO_PIN_4,
@@ -136,30 +136,30 @@ void printColumn(uint16_t colBitmap) {
         GPIO_PIN_SET);
 }
 
-// Font tablosundan karakter bul
+// Look up a character in the font table
 const CharDef* findChar(char c) {
     for (int i = 0; i < FONT_SIZE; i++) {
         if (font[i].c == c) return &font[i];
     }
-    return &font[FONT_SIZE - 1]; // bulunamazsa boşluk
+    return &font[FONT_SIZE - 1]; // not found: print a space
 }
 
-// Tek karakter bas
+// Print one character
 void printChar(char c) {
     const CharDef* ch = findChar(c);
 
     for (int col = 0; col < 5; col++) {
         printColumn(ch->cols[col]);
 
-        // Kolon arası bekleme. Kafa elle kaydırılıyorsa bu sürede kaydırılır.
+        // Wait between columns. This is when the head gets moved by hand.
         HAL_Delay(COL_DELAY_MS);
     }
 
-    // Karakter arası ekstra bekleme
+    // Extra wait between characters
     HAL_Delay(CHAR_SPACE_MS);
 }
 
-// Metin bas
+// Print a string
 void printString(const char* str) {
     while (*str) {
         printChar(*str++);
@@ -202,10 +202,10 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  // TIM2 başlat
+  // Start TIM2
   HAL_TIM_Base_Start(&htim2);
 
-  // Tüm pinleri HIGH yap (MOSFET kapalı)
+  // All pins high (MOSFETs off)
   HAL_GPIO_WritePin(GPIOA,
       GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|
       GPIO_PIN_3|GPIO_PIN_4,
@@ -214,7 +214,7 @@ int main(void)
       GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3,
       GPIO_PIN_SET);
 
-  // Kafayı başlangıç konumuna almak için 3 saniye süre
+  // 3 seconds to bring the head to the start position
   HAL_Delay(3000);
   /* USER CODE END 2 */
 
@@ -227,7 +227,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  printString(printText);
 
-	     // Satır bitti, 5 saniye sonra baştan
+	     // Line done, start again in 5 seconds
 	     HAL_Delay(5000);
   }
   /* USER CODE END 3 */
